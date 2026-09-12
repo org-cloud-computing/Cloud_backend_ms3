@@ -1,0 +1,354 @@
+{
+  "info": {
+    "_postman_id": "c62b5bf4-789a-4c28-98e5-338f09092bc6",
+    "name": "Microservicio Carrito API (MS3 Compliant)",
+    "description": "Colección completa de pruebas para el Microservicio Carrito (Spring Boot + MongoDB) con soporte de Multi-Moneda (USD, PEN, EUR), id_almacen / contenedor (según schema_del_ms3.txt) y recálculo monetario.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string",
+      "description": "URL base del microservicio"
+    },
+    {
+      "key": "carrito_id",
+      "value": "6724a1b8c9e7a2001a111111",
+      "type": "string",
+      "description": "ID del carrito generado en MongoDB"
+    },
+    {
+      "key": "id_cliente",
+      "value": "CLI000001",
+      "type": "string",
+      "description": "ID de cliente de prueba (schema_del_ms3)"
+    },
+    {
+      "key": "id_almacen",
+      "value": "4",
+      "type": "string",
+      "description": "ID de almacén/contenedor (schema_del_ms3)"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Crear Carrito (con Almacén/Contenedor y Moneda USD)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201 || pm.response.code === 200) {",
+              "    const data = pm.response.json();",
+              "    if (data.id) {",
+              "        pm.collectionVariables.set('carrito_id', data.id);",
+              "        pm.environment.set('carrito_id', data.id);",
+              "        console.log('Nuevo carrito_id asignado:', data.id);",
+              "    }",
+              "    pm.test('Estado es ACTIVO', function () {",
+              "        pm.expect(data.estado).to.eql('ACTIVO');",
+              "    });",
+              "    pm.test('Moneda es USD', function () {",
+              "        pm.expect(data.resumen.moneda).to.eql('USD');",
+              "    });",
+              "    pm.test('id_almacen es 4', function () {",
+              "        pm.expect(data.id_almacen).to.eql(4);",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idCliente\": \"{{id_cliente}}\",\n  \"idAlmacen\": 4,\n  \"moneda\": \"USD\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/carritos",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos"]
+        },
+        "description": "Crea un nuevo carrito vacío con id_almacen=4 (schema_del_ms3) y moneda USD. Guarda automáticamente el ID en la variable {{carrito_id}}."
+      }
+    },
+    {
+      "name": "2. Crear Carrito (Formato Legacy solo con idCliente)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idCliente\": \"CLI999999\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/carritos",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos"]
+        },
+        "description": "Prueba de compatibilidad hacia atrás: valida que los clientes que no envían idAlmacen ni moneda siguen funcionando con valores por defecto."
+      }
+    },
+    {
+      "name": "3. Obtener Carrito por ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/carritos/{{carrito_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos", "{{carrito_id}}"]
+        },
+        "description": "Obtiene la entidad completa del carrito por su ID de MongoDB."
+      }
+    },
+    {
+      "name": "4. Obtener Carrito Activo por Cliente",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/carritos/cliente/{{id_cliente}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos", "cliente", "{{id_cliente}}"]
+        },
+        "description": "Recupera el carrito actualmente activo del cliente CLI000001."
+      }
+    },
+    {
+      "name": "5. Agregar Producto 1 (Logitech MX Master 3S - schema_del_ms3)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Producto agregado exitosamente', function () {",
+              "    pm.response.to.have.status(200);",
+              "    const data = pm.response.json();",
+              "    pm.expect(data.items.length).to.be.above(0);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idProducto\": 1001,\n  \"nombre\": \"Logitech MX Master 3S - Mouse inalámbrico ergonómico\",\n  \"precioUnitario\": 99.99,\n  \"urlImagen\": \"https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=320\",\n  \"urlProducto\": \"https://example.com/products/1001\",\n  \"cantidad\": 1,\n  \"moneda\": \"USD\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/carritos/{{carrito_id}}/items",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos", "{{carrito_id}}", "items"]
+        },
+        "description": "Agrega el ítem 1001 correspondiente al registro de schema_del_ms3.txt."
+      }
+    },
+    {
+      "name": "6. Agregar Producto 2 (Monitor Dell 4K UHD)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idProducto\": 1002,\n  \"nombre\": \"Dell UltraSharp U2723QE - Monitor 27\\\" 4K UHD\",\n  \"precioUnitario\": 504.43,\n  \"urlImagen\": \"https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=320\",\n  \"urlProducto\": \"https://example.com/products/1002\",\n  \"cantidad\": 1,\n  \"moneda\": \"USD\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/carritos/{{carrito_id}}/items",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos", "{{carrito_id}}", "items"]
+        },
+        "description": "Al sumar este producto con el anterior (99.99 + 504.43), el subtotal alcanza exactamente 604.42 USD, igual que en schema_del_ms3.txt."
+      }
+    },
+    {
+      "name": "7. Agregar Producto en Moneda Foránea (PEN - Auto Conversión a USD)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idProducto\": 1003,\n  \"nombre\": \"Teclado Mecánico RGB (Catálogo en Soles)\",\n  \"precioUnitario\": 375.00,\n  \"urlImagen\": \"https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=320\",\n  \"urlProducto\": \"https://example.com/products/1003\",\n  \"cantidad\": 1,\n  \"moneda\": \"PEN\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/carritos/{{carrito_id}}/items",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos", "{{carrito_id}}", "items"]
+        },
+        "description": "Prueba la auto-conversión: el producto cuesta 375.00 PEN. Al entrar a un carrito en USD (tasa 3.75 PEN = 1 USD), se almacena como 100.00 USD."
+      }
+    },
+    {
+      "name": "8. Actualizar Cantidad de Producto",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cantidad\": 2\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/carritos/{{carrito_id}}/items/1001",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos", "{{carrito_id}}", "items", "1001"]
+        },
+        "description": "Actualiza la cantidad del producto 1001 a 2 unidades y recalcula el subtotal."
+      }
+    },
+    {
+      "name": "9. Cambiar Moneda del Carrito a Soles (PEN)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"moneda\": \"PEN\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/carritos/{{carrito_id}}/moneda",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos", "{{carrito_id}}", "moneda"]
+        },
+        "description": "Convierte todos los precios_unitarios de los ítems a Soles (PEN) usando BigDecimal y actualiza resumen.moneda a PEN."
+      }
+    },
+    {
+      "name": "10. Cambiar Moneda del Carrito a Euros (EUR)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"moneda\": \"EUR\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/carritos/{{carrito_id}}/moneda",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos", "{{carrito_id}}", "moneda"]
+        },
+        "description": "Convierte la divisa a Euros (EUR) y recalcula el subtotal."
+      }
+    },
+    {
+      "name": "11. Actualizar ID de Contenedor / Almacén",
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/carritos/{{carrito_id}}/contenedor/{{id_almacen}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos", "{{carrito_id}}", "contenedor", "{{id_almacen}}"]
+        },
+        "description": "Actualiza el campo id_almacen con el ID del contenedor asignado."
+      }
+    },
+    {
+      "name": "12. Cambiar Estado del Carrito (PROCESADO)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"estado\": \"PROCESADO\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/carritos/{{carrito_id}}/estado",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos", "{{carrito_id}}", "estado"]
+        },
+        "description": "Cambia el estado del carrito a PROCESADO o ABANDONADO."
+      }
+    },
+    {
+      "name": "13. Eliminar un Producto del Carrito",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/carritos/{{carrito_id}}/items/1001",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos", "{{carrito_id}}", "items", "1001"]
+        },
+        "description": "Elimina el producto con idProducto 1001 del carrito y recalcula."
+      }
+    },
+    {
+      "name": "14. Vaciar Carrito",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/carritos/{{carrito_id}}/items",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos", "{{carrito_id}}", "items"]
+        },
+        "description": "Elimina todos los productos del carrito, dejando total_articulos=0 y subtotal=0.00."
+      }
+    },
+    {
+      "name": "15. Eliminar Carrito",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/carritos/{{carrito_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "carritos", "{{carrito_id}}"]
+        },
+        "description": "Elimina físicamente el documento del carrito en MongoDB (retorna HTTP 204 No Content)."
+      }
+    }
+  ]
+}
