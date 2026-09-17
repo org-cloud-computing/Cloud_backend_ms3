@@ -5,7 +5,10 @@ import com.example.backendcarrito.exception.RecursoNoEncontradoException;
 import com.example.backendcarrito.model.*;
 import com.example.backendcarrito.repository.CarritoRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -15,17 +18,44 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class CarritoService {
-    private final CarritoRepository repository;
 
-    // Moneda por defecto coherente con los registros existentes de MongoDB (schema_del_ms3)
+    private final CarritoRepository repository;
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    @Value("${api.node.url:http://localhost:3000}")
+    private String nodeApiUrl;
+
+    @Value("${api.python.url:http://localhost:8000}")
+    private String pythonApiUrl;
+
     private static final String MONEDA_POR_DEFECTO = "USD";
 
-    // Tasas de cambio fijas respecto a USD como base (1 USD = X moneda)
-    private static final Map<String, BigDecimal> TASAS_RESPECTO_USD = Map.of(
+    private static final Map TASAS_RESPECTO_USD = Map.of(
             "USD", BigDecimal.ONE,
             "PEN", new BigDecimal("3.75"),
             "EUR", new BigDecimal("0.92")
     );
+
+    private static final Map PAIS_A_MONEDA = Map.of(
+            "PERÚ", "PEN",
+            "PERU", "PEN",
+            "USA", "USD",
+            "MÉXICO", "USD",
+            "COLOMBIA", "USD"
+    );
+
+    public String obtenerPaisCliente(String clienteId) {
+        try {
+            String url = nodeApiUrl + "/clientes/" + clienteId + "/pais";
+            Map response = restTemplate.getForObject(url, Map.class);
+            if (response != null && response.containsKey("pais")) {
+                return String.valueOf(response.get("pais"));
+            }
+        } catch (Exception e) {
+            System.err.println("Error al consultar la API externa de clientes: " + e.getMessage());
+        }
+        return "Perú";
+    }
 
     public Carrito crearCarrito(CrearCarritoRequest request) {
         if (repository.findByIdClienteAndEstado(request.idCliente(), EstadoCarrito.ACTIVO).isPresent()) {
@@ -40,8 +70,15 @@ public class CarritoService {
         carrito.setItems(new ArrayList<>());
         carrito.setFechaCreacion(LocalDateTime.now());
 
-        // Inicialización de la moneda en el resumen
-        String monedaInicial = normalizarMoneda(request.moneda() != null ? request.moneda() : MONEDA_POR_DEFECTO);
+        String monedaInicial;
+        if (request.moneda() != null && !request.moneda().isBlank()) {
+            monedaInicial = normalizarMoneda(request.moneda());
+        } else {
+            String pais = obtenerPaisCliente(request.idCliente());
+            String monedaSugerida = (String) PAIS_A_MONEDA.getOrDefault(pais.toUpperCase(), MONEDA_POR_DEFECTO);
+            monedaInicial = normalizarMoneda(monedaSugerida);
+        }
+
         ResumenCarrito resumenInicial = new ResumenCarrito();
         resumenInicial.setMoneda(monedaInicial);
         carrito.setResumen(resumenInicial);
@@ -75,7 +112,6 @@ public class CarritoService {
         return guardarConResumen(carrito);
     }
 
-    // Punto de adaptación: si el item viene en otra moneda, se convierte a la moneda del carrito
     private ItemCarrito crearItem(AgregarItemRequest request, String monedaCarrito) {
         ItemCarrito item = new ItemCarrito();
         item.setIdProducto(request.idProducto());
@@ -127,7 +163,6 @@ public class CarritoService {
         return repository.save(carrito);
     }
 
-    // Soporte para cambiar la moneda del carrito y convertir todos los precios
     public Carrito cambiarMoneda(String id, String nuevaMoneda) {
         Carrito carrito = obtenerPorId(id);
         String destino = normalizarMoneda(nuevaMoneda);
@@ -147,7 +182,6 @@ public class CarritoService {
         return guardarConResumen(carrito);
     }
 
-    // Soporte para actualizar el id de contenedor / almacén
     public Carrito actualizarContenedor(String id, Integer idContenedor) {
         Carrito carrito = obtenerPorId(id);
         carrito.setIdAlmacen(idContenedor);
@@ -201,8 +235,8 @@ public class CarritoService {
         if (origen.equalsIgnoreCase(destino)) {
             return monto.setScale(2, RoundingMode.HALF_UP);
         }
-        BigDecimal tasaOrigen = TASAS_RESPECTO_USD.get(origen);
-        BigDecimal tasaDestino = TASAS_RESPECTO_USD.get(destino);
+        BigDecimal tasaOrigen = (BigDecimal) TASAS_RESPECTO_USD.get(origen);
+        BigDecimal tasaDestino = (BigDecimal) TASAS_RESPECTO_USD.get(destino);
         if (tasaOrigen == null || tasaDestino == null) {
             throw new IllegalArgumentException("Conversión no disponible entre " + origen + " y " + destino);
         }
@@ -227,7 +261,7 @@ public class CarritoService {
         }
         resumen.setTotalArticulos(cantidad);
         resumen.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
-        resumen.setMoneda(monedaActual); // Mantiene la moneda actual sin sobreescribirla fijamente
+        resumen.setMoneda(monedaActual);
         carrito.setResumen(resumen);
         carrito.setFechaActualizacion(LocalDateTime.now());
     }

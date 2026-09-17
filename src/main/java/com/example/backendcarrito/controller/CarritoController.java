@@ -86,4 +86,10 @@ public class CarritoController {
         service.eliminarCarrito(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/health")
+        @Operation(summary = "Health check del servicio")
+        public ResponseEntity health() {
+            return ResponseEntity.ok("OK");
+        }
 }
