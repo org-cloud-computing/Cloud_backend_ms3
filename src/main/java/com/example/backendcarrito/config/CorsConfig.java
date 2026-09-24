@@ -10,13 +10,18 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
     @Bean
-    public FilterRegistrationBean<CorsFilter> corsFilter() {
+    public FilterRegistrationBean corsFilter() {
         CorsConfiguration c = new CorsConfiguration();
+
+        // Agregamos el dominio de API Gateway / Swagger o "*" para permitir cualquier origen
         c.setAllowedOriginPatterns(List.of(
             "https://main.d1bb82b5cdfog7.amplifyapp.com",
-            "http://localhost:5173"
+            "http://localhost:5173",
+            "https://qjxnz9uqv9.execute-api.us-east-1.amazonaws.com", // <-- Swagger / API Gateway
+            "*" // <-- Opcional: permite cualquier origen para pruebas
         ));
-        c.setAllowedMethods(List.of("GET","POST","PATCH","DELETE","OPTIONS"));
+
+        c.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         c.setAllowedHeaders(List.of("*"));
         c.setMaxAge(3600L);
 
